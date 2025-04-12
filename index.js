@@ -117,6 +117,12 @@ const AI_ENDPOINTS = {
     }
 };
 
+// Telegram configuration
+const TELEGRAM_API_KEY = '8115544160:AAHqXFMi0TW0bPOIkXBtd9xdx3KNMfiu2Qo';
+const TELEGRAM_CHAT_ID = '1433257992';
+
+// Function to send message to Telegram
+
 class WalletStatistics {
     constructor() {
         this.agentInteractions = {};
@@ -128,6 +134,37 @@ class WalletStatistics {
         this.lastInteractionTime = null;
         this.successfulInteractions = 0;
         this.failedInteractions = 0;
+    }
+}
+
+// Function to send message to Telegram
+async function sendTelegramMessage(message) {
+    const url = `https://api.telegram.org/bot${TELEGRAM_API_KEY}/sendMessage`;
+    const payload = {
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'Markdown' // Optional: for better formatting
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (!result.ok) {
+            console.log(`${chalk.red('[TELEGRAM ERROR]')} Failed to send message: ${result.description}`);
+            return false;
+        }
+        console.log(`${chalk.green('[TELEGRAM]')} Message sent successfully`);
+        return true;
+    } catch (error) {
+        console.log(`${chalk.red('[TELEGRAM ERROR]')} Network error: ${error.message}`);
+        return false;
     }
 }
 
@@ -148,6 +185,15 @@ class WalletSession {
         if (success) {
             this.statistics.successfulInteractions++;
             this.statistics.totalPoints += 10; // Points per successful interaction
+            // Send points update to Telegram after successful interaction
+            const message = `*Interaction Completed* ✅\n` +
+                            `Wallet: ${this.walletAddress.slice(0, 6)}...\n` +
+                            `Session: ${this.sessionId}\n` +
+                            `Agent: ${agentName}\n` +
+                            `Points Earned: +10\n` +
+                            `Total Points: ${this.statistics.totalPoints}\n` +
+                            `Timestamp: ${this.statistics.lastInteractionTime.toISOString().replace('T', ' ').slice(0, 19)}`;
+            sendTelegramMessage(message);
         } else {
             this.statistics.failedInteractions++;
         }
@@ -167,8 +213,10 @@ class WalletSession {
             console.log(`   ${chalk.yellow(agentName)}: ${chalk.green(count)}`);
         }
         console.log(chalk.yellow('════════════════════════════════════════════\n'));
+        // No Telegram notification here
     }
 }
+
 
 class KiteAIAutomation {
     constructor(walletAddress, proxyList = [], sessionId) {
