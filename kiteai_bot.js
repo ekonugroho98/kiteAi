@@ -8,6 +8,11 @@ import chalk from 'chalk';
 const TELEGRAM_API_KEY = '';
 const TELEGRAM_CHAT_ID = '';
 
+// Tambahkan konfigurasi batas harian
+const MAX_DAILY_POINTS = 200;
+const POINTS_PER_INTERACTION = 10;
+const MAX_DAILY_INTERACTIONS = MAX_DAILY_POINTS / POINTS_PER_INTERACTION;
+
 // Helper untuk mengirim pesan ke Telegram
 async function sendTelegramMessage(message) {
     if (!TELEGRAM_API_KEY || !TELEGRAM_CHAT_ID) return;
@@ -42,30 +47,25 @@ const SAMPLES = [
     {
         name: 'prof',
         main: 'https://deployment-kazqlqgrjw8hbr8blptnpmtj.staging.gokite.ai/main',
-        inference: 'https://neo.prod.zettablock.com/v1/inference?id=b2240763-9b03-4261-99f8-fb05a6c35680',
         report: 'https://quests-usage-dev.prod.zettablock.com/api/report_usage',
-        stats: 'https://quests-usage-dev.prod.zettablock.com/api/user/{wallet}/stats',
         agent_id: 'deployment_UU9y1Z4Z85RAPGwkss1mUUiZ',
         message: 'What is Kite AI?'
     },
     {
         name: 'share',
         main: 'https://deployment-tqgv8vboiwipbkgsmzgdmwpm.staging.gokite.ai/main',
-        inference: 'https://neo.prod.zettablock.com/v1/inference?id=cb43ed21-43f5-483b-ba34-f2a6a3bc1a60',
         report: 'https://quests-usage-dev.prod.zettablock.com/api/report_usage',
-        stats: 'https://quests-usage-dev.prod.zettablock.com/api/user/{wallet}/stats',
         agent_id: 'deployment_ECz5O55dH0dBQaGKuT47kzYC',
         message: 'What do you think of this transaction? 0x252c02bded9a24426219248c9c1b065b752d3cf8bedf4902ed62245ab950895b'
     },
     {
         name: 'crypto_buddy',
         main: 'https://deployment-0ovyzutzgttaydzu6eqn9bxi.staging.gokite.ai/main',
-        inference: 'https://neo.prod.zettablock.com/v1/inference?id=c8ed4e73-1f81-40be-8891-da50b5fec239',
         report: 'https://quests-usage-dev.prod.zettablock.com/api/report_usage',
-        stats: 'https://quests-usage-dev.prod.zettablock.com/api/user/{wallet}/stats',
         agent_id: 'deployment_fseGykIvCLs3m9Nrpe9Zguy9',
         message: 'Price of bitcoin'
     }
+    // Endpoint inference dan stats dibangun dinamis dari interaction_id hasil response step 2
 ];
 
 // Header umum
@@ -97,7 +97,11 @@ function getHeaders(type = 'main') {
     }
 }
 
-async function runSample(sample, wallet, proxy) {
+async function runSample(sample, wallet, proxy, walletState) {
+    if (walletState.dailyPoints >= MAX_DAILY_POINTS) {
+        console.log(chalk.yellow(`[${sample.name}] Wallet ${wallet} sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip...`));
+        return;
+    }
     const agent = createAgent(proxy);
     try {
         // Step 1: /main
@@ -120,21 +124,38 @@ async function runSample(sample, wallet, proxy) {
         const reportText = await reportRes.text();
         console.log(chalk.green(`[${sample.name}] Step 2 /report_usage response: `), reportText.slice(0, 200));
 
-        // Step 3: /inference
-        const infRes = await fetch(sample.inference, { headers: getHeaders('inference'), agent });
+        // Ambil interaction_id dari response step 2
+        let interaction_id = null;
+        try {
+            const reportJson = JSON.parse(reportText);
+            interaction_id = reportJson.interaction_id;
+        } catch (e) {
+            console.log(chalk.red(`[${sample.name}] Gagal parsing interaction_id dari response step 2`));
+        }
+        if (!interaction_id) {
+            console.log(chalk.red(`[${sample.name}] interaction_id tidak ditemukan, skip step 3-5`));
+            return;
+        }
+
+        // Step 3: /inference dengan interaction_id
+        const inferenceUrl = `https://neo.prod.zettablock.com/v1/inference?id=${interaction_id}`;
+        const infRes = await fetch(inferenceUrl, { headers: getHeaders('inference'), agent });
         const infText = await infRes.text();
         console.log(chalk.green(`[${sample.name}] Step 3 /inference response: `), infText.slice(0, 200));
 
-        // Step 4: /inference (ulang)
-        const infRes2 = await fetch(sample.inference, { headers: getHeaders('inference'), agent });
+        // Step 4: /inference (ulang) dengan interaction_id
+        const infRes2 = await fetch(inferenceUrl, { headers: getHeaders('inference'), agent });
         const infText2 = await infRes2.text();
         console.log(chalk.green(`[${sample.name}] Step 4 /inference response: `), infText2.slice(0, 200));
 
-        // Step 5: /stats
-        const statsUrl = sample.stats.replace('{wallet}', wallet);
+        // Step 5: /stats dengan wallet address
+        const statsUrl = `https://quests-usage-dev.prod.zettablock.com/api/user/${wallet}/stats`;
         const statsRes = await fetch(statsUrl, { headers: getHeaders('stats'), agent });
         const statsText = await statsRes.text();
         console.log(chalk.green(`[${sample.name}] Step 5 /stats response: `), statsText.slice(0, 200));
+
+        // Tambah poin harian wallet
+        walletState.dailyPoints += POINTS_PER_INTERACTION;
 
         // (Opsional) Kirim ke Telegram
         await sendTelegramMessage(`Bot ${sample.name} untuk wallet ${wallet} selesai!`);
@@ -150,10 +171,19 @@ async function main() {
         console.log(chalk.red('Tidak ada wallet di wallets.txt'));
         return;
     }
+    // State harian per wallet
+    const walletStates = {};
+    for (const wallet of wallets) {
+        walletStates[wallet] = { dailyPoints: 0 };
+    }
     for (const wallet of wallets) {
         const proxy = proxies.length > 0 ? proxies[Math.floor(Math.random() * proxies.length)] : null;
         for (const sample of SAMPLES) {
-            await runSample(sample, wallet, proxy);
+            await runSample(sample, wallet, proxy, walletStates[wallet]);
+            if (walletStates[wallet].dailyPoints >= MAX_DAILY_POINTS) {
+                console.log(chalk.yellow(`[${wallet}] Sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip sisa sample.`));
+                break;
+            }
         }
     }
 }
