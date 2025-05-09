@@ -1,0 +1,63 @@
+step 1
+curl 'https://deployment-0ovyzutzgttaydzu6eqn9bxi.staging.gokite.ai/main' \
+  -H 'accept: text/event-stream' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'origin: https://agents.testnet.gokite.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://agents.testnet.gokite.ai/' \
+  -H 'sec-ch-ua: "Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36' \
+  --data-raw '{"message":"Price of bitcoin","stream":true}' ;
+
+step 2
+curl 'https://quests-usage-dev.prod.zettablock.com/api/report_usage' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'content-type: application/json' \
+  -H 'origin: https://agents.testnet.gokite.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://agents.testnet.gokite.ai/' \
+  -H 'sec-ch-ua: "Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36' \
+  --data-raw '{"wallet_address":"0xd2d6c2ac9ab120e47cb1c24ae34c579c233f9ab5","agent_id":"deployment_fseGykIvCLs3m9Nrpe9Zguy9","request_text":"Price of bitcoin","response_text":" the price of bitcoin is not present in the given data.","ttft":3560.60000000149,"total_time":4594.70000000298,"request_metadata":{}}' ;
+
+step 3
+curl 'https://neo.prod.zettablock.com/v1/inference?id=c8ed4e73-1f81-40be-8891-da50b5fec239' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'origin: https://agents.testnet.gokite.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://agents.testnet.gokite.ai/' \
+  -H 'sec-ch-ua: "Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36' ;
+
+step 4
+curl 'https://quests-usage-dev.prod.zettablock.com/api/user/0xd2d6c2ac9ab120e47cb1c24ae34c579c233f9ab5/stats' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'origin: https://agents.testnet.gokite.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://agents.testnet.gokite.ai/' \
+  -H 'sec-ch-ua: "Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36'
