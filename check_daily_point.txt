@@ -1,0 +1,67 @@
+curl 'https://api-kiteai.bonusblock.io/api/kite-ai/get-status' \
+  -H 'accept: application/json, text/plain, */*' \
+  -H 'accept-language: en-US,en;q=0.9' \
+  -H 'origin: https://testnet.gokite.ai' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://testnet.gokite.ai/' \
+  -H 'sec-ch-ua: "Chromium";v="136", "Google Chrome";v="136", "Not.A/Brand";v="99"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: cross-site' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36' \
+  -H 'x-auth-token: v2:maghn1fsKA79RH7soWDB2ECNqEgZlRo9wxwOnsgCsIkPPV18Yxt4tk5jvQxpOXleb27gqJJvV9MC0cgZtTX0LqBDfKMobGrAoI1tAw9m1kyU6-ow7wql2JX9u93u_srEVf_eNcXJm2IpVuUVyRU6F9EaKTiZDq1qo_5S14ECmIWOLkjw'
+
+  response:
+
+  {
+    "errors": [],
+    "payload": {
+        "doneMissions": "kiteai-mission-actions-1;kiteai-mission-onboarding-1;kiteai-mission-social-1;kiteai-mission-social-2;kiteai-mission-social-3;kiteai-mission-social-5;kiteai-mission-tutorial-1",
+        "twitterMissionInProgress": [],
+        "session": {
+            "expiresOn": "2025-05-09T13:42:00.712Z",
+            "token": "v2:maghn1fsKA79RH7soWDB2ECNqEgZlRo9wxwOnsgCsIkPPV18Yxt4tk5jvQxpOXleb27gqJJvV9MC0cgZtTX0LqBDfKMobGrAoI1tAw9m1kyU6-ow7wql2JX9u93u_srEVf_eNcXJm2IpVuUVyRU6F9EaKTiZDq1qo_5S14ECmIWOLkjw"
+        },
+        "userXp": 5520,
+        "rank": 799285,
+        "totalQuestsDone": 33,
+        "account": {
+            "userId": "hR4mRcwW",
+            "createdOn": "2025-02-14T15:37:58.524Z",
+            "modifiedOn": "2025-02-14T15:37:58.526Z",
+            "invitedCount": 17,
+            "twitter": "391762539",
+            "discord": "879182218973552680",
+            "github": null,
+            "telegram": null,
+            "reddit": null,
+            "email": null,
+            "username": null,
+            "hasAvatar": false,
+            "xpMultiplier": 1.000,
+            "metadata": {
+                "TWITTER_USERNAME": "ekonugroho45",
+                "DISCORD_USERNAME": "ekonugroho45",
+                "DISCORD_GLOBAL_NAME": "ekonugroho45",
+                "TWITTER_DISPLAY_NAME": "Eko Nugroho"
+            },
+            "wallets": [
+                {
+                    "network": "ethereum",
+                    "address": "0xd2d6c2ac9ab120e47cb1c24ae34c579c233f9ab5",
+                    "createdOn": "2025-02-14T15:37:58.526Z",
+                    "modifiedOn": "2025-02-14T15:37:58.527Z"
+                }
+            ]
+        },
+        "firstLogin": false,
+        "totalAgentActions": 497,
+        "dailyAgentAction": 20,
+        "totalAgentActionsXp": 4970,
+        "dailyAgentActionsXp": 200
+    },
+    "success": true,
+    "now": "2025-05-09T12:05:51.736Z"
+}

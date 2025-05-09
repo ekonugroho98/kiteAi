@@ -97,6 +97,36 @@ function getHeaders(type = 'main') {
     }
 }
 
+async function getDailyPoints(wallet, proxy) {
+    const url = 'https://api-kiteai.bonusblock.io/api/kite-ai/get-status';
+    const headers = {
+        'accept': 'application/json, text/plain, */*',
+        // 'x-auth-token': 'TOKEN_WALLET', // sesuaikan jika perlu
+    };
+    const agent = createAgent(proxy);
+    try {
+        const res = await fetch(url, { headers, agent });
+        const text = await res.text();
+        if (!res.ok) {
+            console.log(chalk.red(`[${wallet}] API status: ${res.status}`));
+            console.log(chalk.red(`[${wallet}] Raw response: ${text}`));
+            return 0;
+        }
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            console.log(chalk.red(`[${wallet}] Gagal parse JSON: ${e.message}`));
+            console.log(chalk.red(`[${wallet}] Raw response: ${text}`));
+            return 0;
+        }
+        return data?.payload?.dailyAgentActionsXp || 0;
+    } catch (e) {
+        console.log(chalk.red(`[${wallet}] Gagal cek daily point: ${e.message}`));
+        return 0;
+    }
+}
+
 async function runSample(sample, wallet, proxy, walletState) {
     if (walletState.dailyPoints >= MAX_DAILY_POINTS) {
         console.log(chalk.yellow(`[${sample.name}] Wallet ${wallet} sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip...`));
@@ -171,20 +201,30 @@ async function main() {
         console.log(chalk.red('Tidak ada wallet di wallets.txt'));
         return;
     }
-    // State harian per wallet
-    const walletStates = {};
-    for (const wallet of wallets) {
-        walletStates[wallet] = { dailyPoints: 0 };
-    }
-    for (const wallet of wallets) {
-        const proxy = proxies.length > 0 ? proxies[Math.floor(Math.random() * proxies.length)] : null;
-        for (const sample of SAMPLES) {
-            await runSample(sample, wallet, proxy, walletStates[wallet]);
-            if (walletStates[wallet].dailyPoints >= MAX_DAILY_POINTS) {
-                console.log(chalk.yellow(`[${wallet}] Sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip sisa sample.`));
-                break;
-            }
+
+    // Loop harian
+    while (true) {
+        // State harian per wallet
+        const walletStates = {};
+        for (const wallet of wallets) {
+            walletStates[wallet] = { dailyPoints: 0 };
         }
+
+        // Jalankan semua wallet paralel
+        await Promise.all(wallets.map(async (wallet) => {
+            const proxy = proxies.length > 0 ? proxies[Math.floor(Math.random() * proxies.length)] : null;
+            for (const sample of SAMPLES) {
+                await runSample(sample, wallet, proxy, walletStates[wallet]);
+                if (walletStates[wallet].dailyPoints >= MAX_DAILY_POINTS) {
+                    console.log(chalk.yellow(`[${wallet}] Sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip sisa sample.`));
+                    break;
+                }
+            }
+        }));
+
+        // Setelah semua wallet selesai, delay 24 jam
+        console.log(chalk.cyan('Semua wallet sudah mencapai max daily points. Menunggu 24 jam sebelum reset...'));
+        await new Promise(resolve => setTimeout(resolve, 24 * 60 * 60 * 1000));
     }
 }
 
