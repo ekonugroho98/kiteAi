@@ -1,82 +1,69 @@
-# Kite AI Auto-Bot
+# Kite AI Auto Bot
 
-An automated interaction bot for Kite AI platform with multi-wallet and proxy support.
+This is a Dockerized version of the Kite AI Auto Bot application.
 
-## Register 
+## Prerequisites
 
-- https://testnet.gokite.ai/?r=kxsQ3byj 
+- Docker installed on your system
+- Docker Compose (optional, for easier management)
 
-## 🌟 Features
+## Setup
 
-- Multiple wallet support (manual input or file-based)
-- Proxy support (HTTP/HTTPS/SOCKS)
-- Rate limiting and retry mechanisms
-- Multiple AI agents interaction
-- Automatic question selection
-- Usage reporting
-- Graceful error handling
+1. Make sure you have your `wallets.txt` and `proxies.txt` files ready in the project directory.
 
-## 📋 Prerequisites
-
-- Node.js (v16 or higher)
-- npm (Node Package Manager)
-
-## 🛠️ Installation
-
-1. Clone the repository:
+2. Using Docker Compose (Recommended):
 ```bash
-git clone https://github.com/airdropinsiders/KiteAi-Auto-Bot.git
-cd KiteAi-Auto-Bot
+# Build and start the container
+docker-compose up --build
+
+# To run in detached mode
+docker-compose up -d
+
+# To stop the container
+docker-compose down
 ```
 
-2. Install dependencies:
+3. Using Docker directly:
 ```bash
-npm install
+# Build the Docker image
+docker build -t kite-ai-bot .
+
+# Run the container
+docker run -it --rm -v $(pwd)/wallets.txt:/app/wallets.txt -v $(pwd)/proxies.txt:/app/proxies.txt kite-ai-bot
 ```
 
-## 📝 Configuration
+## File Structure
 
-1. (Optional) Create a `proxies.txt` file for proxy support:
-```
-http://user:pass@host:port
-socks5://user:pass@host:port
-```
+- `wallets.txt`: Contains wallet addresses (one per line)
+- `proxies.txt`: Contains proxy configurations (one per line)
+- `docker-compose.yml`: Docker Compose configuration file
+- `Dockerfile`: Docker build instructions
 
-2. Create a `wallets.txt` file for multiple wallets:
-```
-0x1234567890abcdef1234567890abcdef12345678
-0xabcdef1234567890abcdef1234567890abcdef12
-```
+## Notes
 
-## 🚀 Usage
+- The container will mount your local `wallets.txt` and `proxies.txt` files, so you can modify them without rebuilding the container.
+- The application will run in interactive mode so you can see the output and interact with it.
+- Using Docker Compose provides better container management and automatic restart capabilities.
+- The container will automatically restart unless explicitly stopped.
 
-Run the bot:
+## Docker Compose Features
+
+- Automatic container restart on failure
+- Proper volume mounting for configuration files
+- Interactive mode support
+- Isolated network for the container
+- Easy to manage with simple commands
+
+## Troubleshooting
+
+If you encounter any issues:
+
+1. Make sure your `wallets.txt` and `proxies.txt` files are properly formatted
+2. Check if the files have the correct permissions
+3. Ensure you have enough system resources allocated to Docker
+4. Check Docker logs:
 ```bash
-npm run start
+docker-compose logs
+# or for specific service
+docker-compose logs kite-ai-bot
 ```
-
-The bot will prompt you to:
-1. Choose connection mode (Direct/Proxy)
-2. Choose wallet input mode (Manual/File)
-3. Enter wallet address (if manual mode)
-
-## ⚙️ Configuration Options
-
-You can modify the following settings in `index.js`:
-
-- `rateLimitConfig`: Adjust rate limiting parameters
-- `agents`: Modify available AI agents
-- `intervalBetweenCycles`: Change delay between interaction cycles
-
-## 📢 Support
-
-Join our Telegram channel for updates and support:
-https://t.me/AirdropInsiderID
-
-## ⚠️ Disclaimer
-
-This bot is for educational purposes only. Use at your own risk and ensure compliance with Kite AI's terms of service.
-
-## 📜 License
-
-MIT License - feel free to use and modify for your own purposes.

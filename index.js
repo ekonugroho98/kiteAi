@@ -147,12 +147,14 @@ async function sendTelegramMessage(message) {
     };
 
     try {
+        const agent = createAgent("http://10c5c12e57667dbdbe31:480bccdfa21bd67e@177.54.154.87:11000"); // Use current proxy
         const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            
         });
 
         const result = await response.json();
@@ -185,15 +187,6 @@ class WalletSession {
         if (success) {
             this.statistics.successfulInteractions++;
             this.statistics.totalPoints += 10; // Points per successful interaction
-            // Send points update to Telegram after successful interaction
-            const message = `*Interaction Completed* ✅\n` +
-                            `Wallet: ${this.walletAddress.slice(0, 6)}...\n` +
-                            `Session: ${this.sessionId}\n` +
-                            `Agent: ${agentName}\n` +
-                            `Points Earned: +10\n` +
-                            `Total Points: ${this.statistics.totalPoints}\n` +
-                            `Timestamp: ${this.statistics.lastInteractionTime.toISOString().replace('T', ' ').slice(0, 19)}`;
-            sendTelegramMessage(message);
         } else {
             this.statistics.failedInteractions++;
         }
@@ -266,6 +259,14 @@ class KiteAIAutomation {
             if (waitSeconds > 0) {
                 this.logMessage('🎯', `Maximum daily points (${this.MAX_DAILY_POINTS}) reached`, 'yellow');
                 this.logMessage('⏳', `Next reset: ${this.session.nextResetTime.toISOString().replace('T', ' ').slice(0, 19)}`, 'yellow');
+                // Send Telegram notification for max points
+                const message = `*Maximum Daily Points Reached* 🎯\n` +
+                                `Wallet: ${this.session.walletAddress.slice(0, 6)}...\n` +
+                                `Session: ${this.session.sessionId}\n` +
+                                `Total Points: ${this.session.dailyPoints}\n` +
+                                `Next Reset: ${this.session.nextResetTime.toISOString().replace('T', ' ').slice(0, 19)}\n` +
+                                `Timestamp: ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`;
+                await sendTelegramMessage(message);
                 await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
                 this.resetDailyPoints();
             }
@@ -465,10 +466,6 @@ async function main() {
     // Display initial registration message
     console.log(`${chalk.cyan('📝 Register First:')} ${chalk.green('https://testnet.gokite.ai?r=kxsQ3byj')}`);
     console.log(`${chalk.yellow('💡 Join our channel if you got any problem')}\n`);
-    console.log(chalk.magenta('Press any key to continue...'));
-    
-    await waitForKeyPress();
-    console.clear();
     
     console.log(banner);
     
