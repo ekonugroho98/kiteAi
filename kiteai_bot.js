@@ -3,6 +3,8 @@ import fetch from 'node-fetch';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import chalk from 'chalk';
+import { Worker, isMainThread, parentPort, workerData } from 'worker_threads';
+import os from 'os';
 
 // Konfigurasi Telegram (opsional)
 const TELEGRAM_API_KEY = '';
@@ -194,7 +196,67 @@ async function runSample(sample, wallet, proxy, walletState) {
     }
 }
 
+// Fungsi untuk menyimpan state wallet
+async function saveWalletState(walletStates) {
+    try {
+        await fs.writeFile('wallet_states.json', JSON.stringify(walletStates, null, 2));
+    } catch (e) {
+        console.log(chalk.red('Error saving wallet state:', e.message));
+    }
+}
+
+// Fungsi untuk memuat state wallet
+async function loadWalletState() {
+    try {
+        const data = await fs.readFile('wallet_states.json', 'utf8');
+        return JSON.parse(data);
+    } catch {
+        return {};
+    }
+}
+
+// Fungsi untuk mengecek apakah wallet perlu direset (24 jam)
+function shouldResetWallet(walletState) {
+    if (!walletState.lastReset) return true;
+    const now = new Date().getTime();
+    const lastReset = new Date(walletState.lastReset).getTime();
+    return (now - lastReset) >= 24 * 60 * 60 * 1000; // 24 jam dalam milliseconds
+}
+
+// Worker thread function
+async function workerFunction() {
+    const { wallet, proxy, samples } = workerData;
+    const walletState = { 
+        dailyPoints: 0,
+        interactions: 0,
+        lastReset: new Date().toISOString()
+    };
+    
+    for (const sample of samples) {
+        if (walletState.interactions >= MAX_DAILY_INTERACTIONS) {
+            break;
+        }
+        await runSample(sample, wallet, proxy, walletState);
+        walletState.interactions++;
+        walletState.dailyPoints = walletState.interactions * POINTS_PER_INTERACTION;
+    }
+    
+    parentPort.postMessage({ 
+        wallet, 
+        status: 'completed', 
+        points: walletState.dailyPoints,
+        interactions: walletState.interactions,
+        lastReset: walletState.lastReset
+    });
+}
+
+// Main thread function
 async function main() {
+    if (!isMainThread) {
+        await workerFunction();
+        return;
+    }
+
     const wallets = await loadList('wallets.txt');
     const proxies = await loadList('proxies.txt');
     if (wallets.length === 0) {
@@ -202,29 +264,73 @@ async function main() {
         return;
     }
 
-    // Loop harian
+    // Load previous wallet states
+    let walletStates = await loadWalletState();
+    
+    // Calculate number of workers (use 75% of available CPU cores)
+    const numWorkers = Math.max(1, Math.floor(os.cpus().length * 0.75));
+    console.log(chalk.cyan(`Using ${numWorkers} worker threads`));
+
     while (true) {
-        // State harian per wallet
-        const walletStates = {};
-        for (const wallet of wallets) {
-            walletStates[wallet] = { dailyPoints: 0 };
+        // Filter dan reset wallet yang sudah 24 jam
+        const activeWallets = wallets.filter(wallet => {
+            const state = walletStates[wallet] || { 
+                dailyPoints: 0, 
+                interactions: 0,
+                lastReset: new Date().toISOString()
+            };
+            
+            if (shouldResetWallet(state)) {
+                walletStates[wallet] = {
+                    dailyPoints: 0,
+                    interactions: 0,
+                    lastReset: new Date().toISOString()
+                };
+                console.log(chalk.yellow(`[${wallet}] Reset state setelah 24 jam`));
+                return true;
+            }
+            
+            return state.interactions < MAX_DAILY_INTERACTIONS;
+        });
+
+        if (activeWallets.length === 0) {
+            console.log(chalk.cyan('Semua wallet sudah mencapai max daily points. Menunggu 24 jam sebelum reset...'));
+            await new Promise(resolve => setTimeout(resolve, 24 * 60 * 60 * 1000));
+            continue;
         }
 
-        // Jalankan semua wallet paralel
-        await Promise.all(wallets.map(async (wallet) => {
-            const proxy = proxies.length > 0 ? proxies[Math.floor(Math.random() * proxies.length)] : null;
-            for (const sample of SAMPLES) {
-                await runSample(sample, wallet, proxy, walletStates[wallet]);
-                if (walletStates[wallet].dailyPoints >= MAX_DAILY_POINTS) {
-                    console.log(chalk.yellow(`[${wallet}] Sudah mencapai max daily points (${MAX_DAILY_POINTS}), skip sisa sample.`));
-                    break;
-                }
-            }
-        }));
+        // Process wallets in batches
+        for (let i = 0; i < activeWallets.length; i += numWorkers) {
+            const batch = activeWallets.slice(i, i + numWorkers);
+            const workers = batch.map(wallet => {
+                const proxy = proxies.length > 0 ? proxies[Math.floor(Math.random() * proxies.length)] : null;
+                return new Promise((resolve, reject) => {
+                    const worker = new Worker(new URL(import.meta.url), {
+                        workerData: { wallet, proxy, samples: SAMPLES }
+                    });
+                    
+                    worker.on('message', (message) => {
+                        if (message.status === 'completed') {
+                            walletStates[message.wallet] = {
+                                dailyPoints: message.points,
+                                interactions: message.interactions,
+                                lastReset: message.lastReset
+                            };
+                            saveWalletState(walletStates);
+                            console.log(chalk.green(`[${message.wallet}] Completed with ${message.points} points (${message.interactions} interactions)`));
+                        }
+                        resolve();
+                    });
+                    
+                    worker.on('error', reject);
+                    worker.on('exit', (code) => {
+                        if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+                    });
+                });
+            });
 
-        // Setelah semua wallet selesai, delay 24 jam
-        console.log(chalk.cyan('Semua wallet sudah mencapai max daily points. Menunggu 24 jam sebelum reset...'));
-        await new Promise(resolve => setTimeout(resolve, 24 * 60 * 60 * 1000));
+            await Promise.all(workers);
+        }
     }
 }
 
