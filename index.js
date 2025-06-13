@@ -406,6 +406,12 @@ class KiteAIAutomation {
                 this.resetDailyPoints();
                 await this.shouldWaitForNextReset();
 
+                // Tambahkan pengecekan: jika sudah 200 point, stop instance
+                if (this.session.dailyPoints >= this.MAX_DAILY_POINTS) {
+                    this.logMessage('🎯', `Wallet sudah mencapai ${this.MAX_DAILY_POINTS} point, berhenti dan lanjut ke wallet berikutnya.`, 'yellow');
+                    break;
+                }
+
                 interactionCount++;
                 console.log(`\n${chalk.blue(`[Session ${this.session.sessionId}]`)} ${chalk.green(`[${this.session.walletAddress}]`)} ${chalk.cyan('═'.repeat(60))}`);
                 this.logMessage('🔄', `Interaction #${interactionCount}`, 'magenta');

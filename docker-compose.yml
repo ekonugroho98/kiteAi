@@ -1,21 +1,13 @@
-version: '3.8'
+version: '3'
 
 services:
-  kite-ai-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: kite-ai-bot
+  kiteai-bot:
+    build: .
     volumes:
-      - ./wallets.txt:/app/wallets.txt
-      - ./proxies.txt:/app/proxies.txt
-    environment:
-      - NODE_ENV=production
-    tty: true
-    stdin_open: true
+      - ./accounts.txt:/app/accounts.txt
+      - ./config.json:/app/config.json
+      - ./agents.json:/app/agents.json
     restart: unless-stopped
-    networks:
-      - kite-network
 
 networks:
   kite-network:

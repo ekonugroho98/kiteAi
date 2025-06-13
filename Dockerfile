@@ -1,23 +1,18 @@
-# Use Node.js LTS version as base image
-FROM node:20-slim
+FROM python:3.9-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json (if exists)
-COPY package*.json ./
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
-RUN npm install
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all files
+# Copy the rest of the application
 COPY . .
 
-# Create empty files if they don't exist
-RUN touch wallets.txt proxies.txt
-
-# Set environment variables
-ENV NODE_ENV=production
-
-# Command to run the application
-CMD ["node", "kiteai_bot.js"] 
+# Run the bot
+CMD ["python", "kiteAi.v2.py"] 

@@ -42,3 +42,5 @@ connect.lock
 
 wallets.txt
 proxies.txt
+config.json
+venv/

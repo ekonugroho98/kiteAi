@@ -13,12 +13,14 @@
         "proxy"
     ],
     "dependencies": {
-      "axios": "^1.6.7",
-      "chalk": "^5.3.0",
-      "figlet": "^1.7.0",
-      "node-fetch": "^3.3.2",
-      "socks-proxy-agent": "^8.0.2",
-      "http-proxy-agent": "^7.0.0",
-      "https-proxy-agent": "^7.0.2"
+        "anticaptcha": "^2.2.0",
+        "axios": "^1.6.7",
+        "chalk": "^5.4.1",
+        "ethers": "^6.14.3",
+        "figlet": "^1.7.0",
+        "http-proxy-agent": "^7.0.0",
+        "https-proxy-agent": "^7.0.6",
+        "node-fetch": "^3.3.2",
+        "socks-proxy-agent": "^8.0.5"
     }
-  }
+}
