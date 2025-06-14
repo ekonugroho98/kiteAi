@@ -6,6 +6,7 @@ from fake_useragent import FakeUserAgent
 from colorama import *
 from datetime import datetime
 import asyncio, binascii, random, json, os, pytz
+from telegram import Bot
 
 wib = pytz.timezone('Asia/Jakarta')
 
@@ -30,12 +31,15 @@ class KiteAi:
         self.BITTE_SUBNET = "0xca312b44a57cc9fd60f37e6c9a343a1ad92a3b6c"
         self.KITE_AI_SUBNET = "0xb132001567650917d6bd695d1fab55db7986e9a5"
         self.CAPTCHA_KEY = "377c52bebe64c59195ad7cdfd3a994fe"
+        self.TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Ganti dengan token bot Telegram Anda
+        self.TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"  # Ganti dengan chat ID Anda
         self.wallet_proxies = {}
         self.auth_tokens = {}
         self.access_tokens = {}
         self.header_cookies = {}
         self.ai_agents = {}
         self.user_interactions = {}
+        self.telegram_bot = Bot(token=self.TELEGRAM_TOKEN)
 
     def clear_terminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -679,6 +683,20 @@ class KiteAi:
             sa_address = user.get("data", {}).get("profile", {}).get("smart_account_address", "Undifined")
             balance = user.get("data", {}).get("profile", {}).get("total_xp_points", 0)
             
+            # Get name from config.json
+            config_data = self.load_wallet_proxies()
+            wallet_name = "Unknown"
+            for item in config_data:
+                if item.get("wallet") == address:
+                    wallet_name = item.get("name", "Unknown")
+                    break
+
+            # Initialize message components
+            message_components = []
+            message_components.append(f"🔹 <b>Wallet: {wallet_name}</b>")
+            message_components.append(f"👤 Username: {username}")
+            message_components.append(f"💰 Balance: {balance} XP")
+            
             self.log(
                 f"{Fore.CYAN+Style.BRIGHT}Username  :{Style.RESET_ALL}"
                 f"{Fore.WHITE+Style.BRIGHT} {username} {Style.RESET_ALL}"
@@ -702,6 +720,10 @@ class KiteAi:
             if balance:
                 kite_balance = balance.get("data", ).get("balances", {}).get("kite", 0)
                 usdt_balance = balance.get("data", ).get("balances", {}).get("usdt", 0)
+
+                # Add token balance to message
+                message_components.append(f"💎 KITE: {kite_balance}")
+                message_components.append(f"💵 USDT: {usdt_balance}")
 
             self.log(
                 f"{Fore.MAGENTA+Style.BRIGHT}  ● {Style.RESET_ALL}"
@@ -740,23 +762,27 @@ class KiteAi:
                                 f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                                 f"{Fore.GREEN + Style.BRIGHT} Claimed Successfully {Style.RESET_ALL}"
                             )
+                            message_components.append("🎯 Faucet Claim: Success")
                         else:
                             self.log(
                                 f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
                                 f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                                 f"{Fore.RED + Style.BRIGHT} Not Claimed {Style.RESET_ALL}"
                             )
+                            message_components.append("❌ Faucet Claim: Failed")
                     else:
                         self.log(
                             f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
                             f"{Fore.BLUE + Style.BRIGHT}Captcha :{Style.RESET_ALL}"
                             f"{Fore.RED + Style.BRIGHT} Unsolved {Style.RESET_ALL}                 "
                         )
+                        message_components.append("❌ Captcha: Failed to Solve")
                 else:
                     self.log(
                         f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}"
                         f"{Fore.YELLOW+Style.BRIGHT} Not Time to Claim {Style.RESET_ALL}"
                     )
+                    message_components.append("⏳ Faucet: Not Time to Claim")
             else:
                 self.log(
                     f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}"
@@ -803,18 +829,21 @@ class KiteAi:
                                                 f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                                                 f"{Fore.GREEN+Style.BRIGHT} Answered Successfully {Style.RESET_ALL}"
                                             )
+                                            message_components.append("✅ Daily Quiz: Answered Successfully")
                                         else:
                                             self.log(
                                                 f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
                                                 f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                                                 f"{Fore.YELLOW+Style.BRIGHT} Wrong Answer {Style.RESET_ALL}"
                                             )
+                                            message_components.append("❌ Daily Quiz: Wrong Answer")
                                     else:
                                         self.log(
                                             f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
                                             f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                                             f"{Fore.RED+Style.BRIGHT} Submit Answer Failed {Style.RESET_ALL}"
                                         )
+                                        message_components.append("❌ Daily Quiz: Submit Failed")
                         else:
                             self.log(
                                 f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
@@ -833,6 +862,7 @@ class KiteAi:
                         f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                         f"{Fore.YELLOW + Style.BRIGHT} Already Answered {Style.RESET_ALL}"
                     )
+                    message_components.append("⏳ Daily Quiz: Already Answered")
             else:
                 self.log(
                     f"{Fore.CYAN+Style.BRIGHT}Daily Quiz:{Style.RESET_ALL}"
@@ -856,16 +886,19 @@ class KiteAi:
                         f"{Fore.CYAN+Style.BRIGHT} Amount: {Style.RESET_ALL}"
                         f"{Fore.WHITE+Style.BRIGHT}{amount} KITE{Style.RESET_ALL}"
                     )
+                    message_components.append(f"✅ Stake: Success\n💰 Amount: {amount} KITE")
                 else:
                     self.log(
                         f"{Fore.CYAN+Style.BRIGHT}Stake     :{Style.RESET_ALL}"
                         f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
                     )
+                    message_components.append("❌ Stake: Failed")
             else:
                 self.log(
                     f"{Fore.CYAN+Style.BRIGHT}Stake     :{Style.RESET_ALL}"
                     f"{Fore.YELLOW+Style.BRIGHT} Insufficinet Kite Token Balance {Style.RESET_ALL}"
                 )
+                message_components.append("⚠️ Stake: Insufficient Balance")
 
             unstake = await self.claim_stake_rewards(address, proxy)
             if unstake:
@@ -877,15 +910,18 @@ class KiteAi:
                     f"{Fore.CYAN+Style.BRIGHT} Reward: {Style.RESET_ALL}"
                     f"{Fore.WHITE+Style.BRIGHT}{reward} KITE{Style.RESET_ALL}"
                 )
+                message_components.append(f"✅ Unstake: Success\n💰 Reward: {reward} KITE")
             else:
                 self.log(
                     f"{Fore.CYAN+Style.BRIGHT}Unstake   :{Style.RESET_ALL}"
                     f"{Fore.RED+Style.BRIGHT} Failed {Style.RESET_ALL}"
                 )
+                message_components.append("❌ Unstake: Failed")
 
             self.log(f"{Fore.CYAN+Style.BRIGHT}AI Agents :{Style.RESET_ALL}")
 
             self.user_interactions[address] = 0
+            successful_interactions = 0
 
             while self.user_interactions[address] < interact_count:
                 self.log(
@@ -919,6 +955,7 @@ class KiteAi:
                             f"{Fore.CYAN + Style.BRIGHT}    Status    : {Style.RESET_ALL}"
                             f"{Fore.GREEN + Style.BRIGHT}Receipt Submited Successfully{Style.RESET_ALL}"
                         )
+                        successful_interactions += 1
                     else:
                         self.log(
                             f"{Fore.CYAN + Style.BRIGHT}    Status    : {Style.RESET_ALL}"
@@ -932,7 +969,24 @@ class KiteAi:
 
                 await self.print_timer(5, 10)
 
+            # Add AI Agents summary to message
+            message_components.append(f"✅ AI Agents: {successful_interactions}/{interact_count} Successful")
+
+            # Send combined message
+            combined_message = "\n\n".join(message_components)
+            await self.send_telegram_message(combined_message)
+
         self.user_interactions[address] = 0
+
+    async def send_telegram_message(self, message):
+        try:
+            await self.telegram_bot.send_message(
+                chat_id=self.TELEGRAM_CHAT_ID,
+                text=message,
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            self.log(f"{Fore.RED + Style.BRIGHT}Failed to send Telegram message: {e}{Style.RESET_ALL}")
 
     async def main(self):
         try:
