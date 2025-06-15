@@ -30,9 +30,9 @@ class KiteAi:
         self.BITMIND_SUBNET = "0xc368ae279275f80125284d16d292b650ecbbff8d"
         self.BITTE_SUBNET = "0xca312b44a57cc9fd60f37e6c9a343a1ad92a3b6c"
         self.KITE_AI_SUBNET = "0xb132001567650917d6bd695d1fab55db7986e9a5"
-        self.CAPTCHA_KEY = "377c52bebe64c59195ad7cdfd3a994fe"
-        self.TELEGRAM_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"  # Ganti dengan token bot Telegram Anda
-        self.TELEGRAM_CHAT_ID = "YOUR_CHAT_ID"  # Ganti dengan chat ID Anda
+        self.CAPTCHA_KEY = "604695eb836145aac98b282b83a7f96b"
+        self.TELEGRAM_TOKEN = "8115544160:AAHqXFMi0TW0bPOIkXBtd9xdx3KNMfiu2Qo"  # Ganti dengan token bot Telegram Anda
+        self.TELEGRAM_CHAT_ID = "1433257992"  # Ganti dengan chat ID Anda
         self.wallet_proxies = {}
         self.auth_tokens = {}
         self.access_tokens = {}
@@ -739,44 +739,66 @@ class KiteAi:
 
                 if is_claimable:
                     self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}")
-                    print(
-                        f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                        f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                        f"{Fore.BLUE + Style.BRIGHT}Wait For Solving Captcha...{Style.RESET_ALL}",
-                        end="\r",
-                        flush=True
-                    )
-
-                    recaptcha_token = await self.solve_recaptcha(proxy)
-                    if recaptcha_token:
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                            f"{Fore.BLUE + Style.BRIGHT}Captcha :{Style.RESET_ALL}"
-                            f"{Fore.GREEN + Style.BRIGHT} Solved {Style.RESET_ALL}                 "
-                        )
-
-                        claim = await self.claim_faucet(address, recaptcha_token, proxy)
-                        if claim:
+                    
+                    # Add retry mechanism for captcha
+                    max_retries = 3
+                    retry_count = 0
+                    claim_success = False
+                    
+                    while retry_count < max_retries and not claim_success:
+                        if retry_count > 0:
                             self.log(
                                 f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                                f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                                f"{Fore.GREEN + Style.BRIGHT} Claimed Successfully {Style.RESET_ALL}"
+                                f"{Fore.BLUE + Style.BRIGHT}Retry    :{Style.RESET_ALL}"
+                                f"{Fore.YELLOW + Style.BRIGHT} Attempt {retry_count + 1} of {max_retries} {Style.RESET_ALL}"
                             )
-                            message_components.append("🎯 Faucet Claim: Success")
+                        
+                        print(
+                            f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                            f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
+                            f"{Fore.BLUE + Style.BRIGHT}Wait For Solving Captcha...{Style.RESET_ALL}",
+                            end="\r",
+                            flush=True
+                        )
+
+                        recaptcha_token = await self.solve_recaptcha(proxy)
+                        if recaptcha_token:
+                            self.log(
+                                f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
+                                f"{Fore.BLUE + Style.BRIGHT}Captcha :{Style.RESET_ALL}"
+                                f"{Fore.GREEN + Style.BRIGHT} Solved {Style.RESET_ALL}                 "
+                            )
+
+                            claim = await self.claim_faucet(address, recaptcha_token, proxy)
+                            if claim:
+                                self.log(
+                                    f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
+                                    f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
+                                    f"{Fore.GREEN + Style.BRIGHT} Claimed Successfully {Style.RESET_ALL}"
+                                )
+                                message_components.append("🎯 Faucet Claim: Success")
+                                claim_success = True
+                            else:
+                                self.log(
+                                    f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
+                                    f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
+                                    f"{Fore.RED + Style.BRIGHT} Not Claimed {Style.RESET_ALL}"
+                                )
+                                retry_count += 1
+                                if retry_count < max_retries:
+                                    await asyncio.sleep(5)  # Wait 5 seconds before retry
                         else:
                             self.log(
                                 f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                                f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                                f"{Fore.RED + Style.BRIGHT} Not Claimed {Style.RESET_ALL}"
+                                f"{Fore.BLUE + Style.BRIGHT}Captcha :{Style.RESET_ALL}"
+                                f"{Fore.RED + Style.BRIGHT} Unsolved {Style.RESET_ALL}                 "
                             )
-                            message_components.append("❌ Faucet Claim: Failed")
-                    else:
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                            f"{Fore.BLUE + Style.BRIGHT}Captcha :{Style.RESET_ALL}"
-                            f"{Fore.RED + Style.BRIGHT} Unsolved {Style.RESET_ALL}                 "
-                        )
-                        message_components.append("❌ Captcha: Failed to Solve")
+                            retry_count += 1
+                            if retry_count < max_retries:
+                                await asyncio.sleep(5)  # Wait 5 seconds before retry
+                    
+                    if not claim_success:
+                        message_components.append("❌ Faucet Claim: Failed after all retries")
                 else:
                     self.log(
                         f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}"
@@ -1016,6 +1038,9 @@ class KiteAi:
                     await self.load_proxies(use_proxy_choice)
                 
                 separator = "=" * 25
+                
+                # Process accounts in parallel
+                tasks = []
                 for address in self.accounts:
                     if address:
                         self.log(
@@ -1030,8 +1055,14 @@ class KiteAi:
                         
                         self.auth_tokens[address] = auth_token
                         
-                        await self.process_accounts(address, agents, faucet, count, use_proxy, rotate_proxy)
-                        await asyncio.sleep(3)
+                        # Create task for each account
+                        task = asyncio.create_task(
+                            self.process_accounts(address, agents, faucet, count, use_proxy, rotate_proxy)
+                        )
+                        tasks.append(task)
+                
+                # Wait for all tasks to complete
+                await asyncio.gather(*tasks)
 
                 self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*72)
                 seconds = 24 * 60 * 60
