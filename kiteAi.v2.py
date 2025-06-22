@@ -106,7 +106,20 @@ class KiteAi:
             return None
         schemes = ["http://", "https://", "socks4://", "socks5://"]
         if any(proxy.startswith(scheme) for scheme in schemes):
-            return proxy
+            # URL encode the username and password if they contain special characters
+            try:
+                from urllib.parse import urlparse, quote
+                parsed = urlparse(proxy)
+                if parsed.username and parsed.password:
+                    # URL encode username and password
+                    encoded_username = quote(parsed.username, safe='')
+                    encoded_password = quote(parsed.password, safe='')
+                    # Rebuild the URL with encoded credentials
+                    proxy = f"{parsed.scheme}://{encoded_username}:{encoded_password}@{parsed.hostname}:{parsed.port}"
+                return proxy
+            except Exception as e:
+                # If parsing fails, return original proxy
+                return proxy
         return f"http://{proxy}"
 
     async def load_proxies(self, use_proxy_choice: int):
@@ -183,8 +196,19 @@ class KiteAi:
             result = iv + ciphertext + auth_tag
             result_hex = binascii.hexlify(result).decode()
 
+            # Debug auth token generation
+            self.log(
+                f"{Fore.CYAN + Style.BRIGHT}Auth Token Debug - Address: {self.mask_account(address)}{Style.RESET_ALL}"
+            )
+            self.log(
+                f"{Fore.CYAN + Style.BRIGHT}Auth Token Debug - Token: {result_hex[:20]}...{Style.RESET_ALL}"
+            )
+
             return result_hex
         except Exception as e:
+            self.log(
+                f"{Fore.RED + Style.BRIGHT}Generate Auth Token Failed: {str(e)}{Style.RESET_ALL}"
+            )
             raise Exception(f"Generate Auth Token Failed: {str(e)}")
     
     def generate_quiz_title(self):
@@ -350,21 +374,137 @@ class KiteAi:
         }
         await asyncio.sleep(3)
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
+            connector = None
+            if proxy:
+                # Try to use aiohttp with custom proxy setup
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(proxy)
+                    
+                    self.log(
+                        f"{Fore.CYAN + Style.BRIGHT}Login Debug - Attempting Custom Proxy Setup{Style.RESET_ALL}"
+                    )
+                    self.log(
+                        f"{Fore.CYAN + Style.BRIGHT}Login Debug - Proxy: {parsed.hostname}:{parsed.port}{Style.RESET_ALL}"
+                    )
+                    
+                    # Create aiohttp connector with proxy
+                    import aiohttp
+                    connector = aiohttp.TCPConnector()
+                    
+                    # Set proxy for this session instead of connector
+                    proxy_url = f"http://{parsed.username}:{parsed.password}@{parsed.hostname}:{parsed.port}"
+                    
+                except Exception as e:
+                    self.log(
+                        f"{Fore.RED + Style.BRIGHT}Login Debug - Custom Proxy Setup Failed: {str(e)}{Style.RESET_ALL}"
+                    )
+                    connector = None
+                    proxy_url = None
+            else:
+                proxy_url = None
             try:
+                # Debug request details
+                self.log(
+                    f"{Fore.YELLOW + Style.BRIGHT}Login Debug - URL: {url}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.YELLOW + Style.BRIGHT}Login Debug - Payload: {data}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.YELLOW + Style.BRIGHT}Login Debug - Auth Header: {headers.get('Authorization', 'Missing')[:30]}...{Style.RESET_ALL}"
+                )
+                
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, data=data) as response:
+                    async with session.post(url=url, headers=headers, data=data, proxy=proxy_url if 'proxy_url' in locals() else None) as response:
+                        # Debug response untuk login failed
+                        if response.status != 200:
+                            error_text = await response.text()
+                            self.log(
+                                f"{Fore.RED + Style.BRIGHT}Login Debug - Status: {response.status}{Style.RESET_ALL}"
+                            )
+                            self.log(
+                                f"{Fore.RED + Style.BRIGHT}Login Debug - Response: {error_text[:200]}...{Style.RESET_ALL}"
+                            )
+                            self.log(
+                                f"{Fore.RED + Style.BRIGHT}Login Debug - Headers: {dict(response.headers)}{Style.RESET_ALL}"
+                            )
+                        
                         response.raise_for_status()
                         result = await response.json()
+
+                        # Debug successful response
+                        self.log(
+                            f"{Fore.GREEN + Style.BRIGHT}Login Debug - Success Response: {str(result)[:100]}...{Style.RESET_ALL}"
+                        )
 
                         raw_cookies = response.headers.getall('Set-Cookie', [])
                         if raw_cookies:
                             cookie_header = self.extract_cookies(raw_cookies)
+                            self.log(
+                                f"{Fore.GREEN + Style.BRIGHT}Login Debug - Cookies Found: {len(raw_cookies)} cookies{Style.RESET_ALL}"
+                            )
 
                             if cookie_header:
-                                return result["data"]["access_token"], cookie_header
-            except (Exception, ClientResponseError) as e:
+                                access_token = result.get("data", {}).get("access_token")
+                                if access_token:
+                                    self.log(
+                                        f"{Fore.GREEN + Style.BRIGHT}Login Debug - Access Token: {access_token[:20]}...{Style.RESET_ALL}"
+                                    )
+                                    return access_token, cookie_header
+                                else:
+                                    self.log(
+                                        f"{Fore.RED + Style.BRIGHT}Login Debug - No Access Token in Response{Style.RESET_ALL}"
+                                    )
+                            else:
+                                self.log(
+                                    f"{Fore.RED + Style.BRIGHT}Login Debug - Cookie Extraction Failed{Style.RESET_ALL}"
+                                )
+                        else:
+                            self.log(
+                                f"{Fore.RED + Style.BRIGHT}Login Debug - No Cookies in Response{Style.RESET_ALL}"
+                            )
+            except ClientResponseError as e:
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}Login ClientResponseError - Status: {e.status}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}Login ClientResponseError - Message: {str(e)}{Style.RESET_ALL}"
+                )
+                if hasattr(e, 'response_obj') and e.response_obj:
+                    try:
+                        error_body = await e.response_obj.text()
+                        self.log(
+                            f"{Fore.RED + Style.BRIGHT}Login ClientResponseError - Body: {error_body[:200]}...{Style.RESET_ALL}"
+                        )
+                    except:
+                        pass
                 if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                return None, None
+            except Exception as e:
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}Login Exception - Type: {type(e).__name__}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}Login Exception - Message: {str(e)}{Style.RESET_ALL}"
+                )
+                
+                # Check for specific error types
+                if "timeout" in str(e).lower():
+                    self.log(
+                        f"{Fore.YELLOW + Style.BRIGHT}Login Debug - Timeout detected, proxy issue possible{Style.RESET_ALL}"
+                    )
+                elif "connection" in str(e).lower():
+                    self.log(
+                        f"{Fore.YELLOW + Style.BRIGHT}Login Debug - Connection error, proxy/network issue{Style.RESET_ALL}"
+                    )
+                
+                if attempt < retries - 1:
+                    self.log(
+                        f"{Fore.YELLOW + Style.BRIGHT}Login Debug - Retrying in 5 seconds... (Attempt {attempt + 2}/{retries}){Style.RESET_ALL}"
+                    )
                     await asyncio.sleep(5)
                     continue
                 return None, None
@@ -377,13 +517,53 @@ class KiteAi:
         }
         await asyncio.sleep(3)
         for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
+            connector = None  # Disable proxy for now
             try:
+                self.log(
+                    f"{Fore.YELLOW + Style.BRIGHT}User Data Debug - URL: {url}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.YELLOW + Style.BRIGHT}User Data Debug - Auth Header: {headers.get('Authorization', 'Missing')[:30]}...{Style.RESET_ALL}"
+                )
+                
                 async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
                     async with session.get(url=url, headers=headers) as response:
+                        self.log(
+                            f"{Fore.CYAN + Style.BRIGHT}User Data Debug - Response Status: {response.status}{Style.RESET_ALL}"
+                        )
+                        
+                        if response.status != 200:
+                            error_text = await response.text()
+                            self.log(
+                                f"{Fore.RED + Style.BRIGHT}User Data Debug - Error Response: {error_text[:200]}...{Style.RESET_ALL}"
+                            )
+                            
                         response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
+                        result = await response.json()
+                        
+                        self.log(
+                            f"{Fore.GREEN + Style.BRIGHT}User Data Debug - Success Response: {str(result)[:100]}...{Style.RESET_ALL}"
+                        )
+                        
+                        return result
+            except ClientResponseError as e:
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}User Data ClientResponseError - Status: {e.status}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}User Data ClientResponseError - Message: {str(e)}{Style.RESET_ALL}"
+                )
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+                return None
+            except Exception as e:
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}User Data Exception - Type: {type(e).__name__}{Style.RESET_ALL}"
+                )
+                self.log(
+                    f"{Fore.RED + Style.BRIGHT}User Data Exception - Message: {str(e)}{Style.RESET_ALL}"
+                )
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue

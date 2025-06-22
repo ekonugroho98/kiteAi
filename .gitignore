@@ -44,3 +44,6 @@ wallets.txt
 proxies.txt
 config.json
 venv/
+proxy.txt
+telegram.json
+captcha_key.txt

@@ -3,10 +3,13 @@ version: '3'
 services:
   kiteai-bot:
     build: .
+    command: python bot-anti.py
     volumes:
       - ./accounts.txt:/app/accounts.txt
-      - ./config.json:/app/config.json
+      - ./proxy.txt:/app/proxy.txt
       - ./agents.json:/app/agents.json
+      - ./captcha_key.txt:/app/captcha_key.txt
+      - ./telegram.json:/app/telegram.json
     restart: unless-stopped
 
 networks:
