@@ -45,6 +45,7 @@ class KiteAi:
         self.max_delay = 0
         self.telegram_bot = None
         self.telegram_chat_id = None
+        self.proxy_lock = asyncio.Lock()
 
     def clear_terminal(self):
         os.system('cls' if os.name == 'nt' else 'clear')
@@ -146,22 +147,24 @@ class KiteAi:
             return proxies
         return f"http://{proxies}"
 
-    def get_next_proxy_for_account(self, token):
-        if token not in self.account_proxies:
+    async def get_next_proxy_for_account(self, token):
+        async with self.proxy_lock:
+            if token not in self.account_proxies:
+                if not self.proxies:
+                    return None
+                proxy = self.check_proxy_schemes(self.proxies[self.proxy_index])
+                self.account_proxies[token] = proxy
+                self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
+            return self.account_proxies[token]
+
+    async def rotate_proxy_for_account(self, token):
+        async with self.proxy_lock:
             if not self.proxies:
                 return None
             proxy = self.check_proxy_schemes(self.proxies[self.proxy_index])
             self.account_proxies[token] = proxy
             self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
-        return self.account_proxies[token]
-
-    def rotate_proxy_for_account(self, token):
-        if not self.proxies:
-            return None
-        proxy = self.check_proxy_schemes(self.proxies[self.proxy_index])
-        self.account_proxies[token] = proxy
-        self.proxy_index = (self.proxy_index + 1) % len(self.proxies)
-        return proxy
+            return proxy
 
     def generate_auth_token(self, address):
         try:
@@ -765,7 +768,7 @@ class KiteAi:
             
     async def process_user_signin(self, address: str, use_proxy: bool, rotate_proxy: bool):
         while True:
-            proxy = self.get_next_proxy_for_account(address) if use_proxy else None
+            proxy = await self.get_next_proxy_for_account(address) if use_proxy else None
             self.log(
                 f"{Fore.CYAN+Style.BRIGHT}Proxy     :{Style.RESET_ALL}"
                 f"{Fore.WHITE+Style.BRIGHT} {proxy} {Style.RESET_ALL}"
@@ -783,7 +786,7 @@ class KiteAi:
                 return True
             
             if rotate_proxy:
-                proxy = self.rotate_proxy_for_account(address)
+                proxy = await self.rotate_proxy_for_account(address)
                 await asyncio.sleep(5)
                 continue
 
@@ -809,7 +812,7 @@ class KiteAi:
             await self.send_telegram_message(final_message)
             return
 
-        proxy = self.get_next_proxy_for_account(address) if use_proxy else None
+        proxy = await self.get_next_proxy_for_account(address) if use_proxy else None
         user = await self.user_data(address, proxy)
         if not user:
             final_message = f"👤 Wallet {account_index}: {masked_address}\n"
@@ -990,35 +993,37 @@ class KiteAi:
                 if use_proxy:
                     await self.load_proxies(use_proxy_choice)
                 
-                separator = "=" * 25
+                tasks = []
                 for i, address in enumerate(accounts, 1):
                     if address:
-                        self.log(
-                            f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {self.mask_account(address)} {Style.RESET_ALL}"
-                            f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
-                        )
-                        await self.send_telegram_message(f"Memproses akun: {self.mask_account(address)}")
-
-                        if not address:
-                            self.log(
-                                f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
-                                f"{Fore.RED+Style.BRIGHT} Invalid Private Key or Libraries Version Not Supported {Style.RESET_ALL}"
-                            )
-                            continue
-                        
                         auth_token = self.generate_auth_token(address)
                         if not auth_token:
-                            self.log(
-                                f"{Fore.CYAN+Style.BRIGHT}Status    :{Style.RESET_ALL}"
-                                f"{Fore.RED+Style.BRIGHT} Generate Auth Token Failed, Check Your Cryptography Library {Style.RESET_ALL}                  "
-                            )
+                            self.log(f"{Fore.RED+Style.BRIGHT}Gagal membuat token otentikasi untuk {self.mask_account(address)}, melompat.{Style.RESET_ALL}")
                             continue
                         
                         self.auth_tokens[address] = auth_token
                         
-                        await self.process_accounts(i, address, faucet, use_proxy, rotate_proxy)
-                        await asyncio.sleep(3)
+                        self.log(f"{Fore.YELLOW}Menjadwalkan akun {i} ({self.mask_account(address)}) untuk dijalankan.{Style.RESET_ALL}")
+                        
+                        task = asyncio.create_task(self.process_accounts(i, address, faucet, use_proxy, rotate_proxy))
+                        tasks.append(task)
+                        
+                        if i < len(accounts):
+                            self.log(f"Menunggu 5 menit sebelum memulai akun berikutnya...")
+                            for remaining in range(300, 0, -1):
+                                print(
+                                    f"{Fore.CYAN+Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
+                                    f"{Fore.WHITE+Style.BRIGHT} | {Style.RESET_ALL}"
+                                    f"{Fore.BLUE+Style.BRIGHT}Akun berikutnya dimulai dalam {self.format_seconds(remaining)}...{Style.RESET_ALL}",
+                                    end="\r",
+                                    flush=True
+                                )
+                                await asyncio.sleep(1)
+                            print()
+
+                if tasks:
+                    self.log("Semua akun telah dimulai, menunggu penyelesaian...")
+                    await asyncio.gather(*tasks)
 
                 self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*72)
                 await self.send_telegram_message("Semua akun telah diproses. Menunggu siklus berikutnya.")
