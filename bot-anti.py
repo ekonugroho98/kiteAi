@@ -281,6 +281,19 @@ class KiteAi:
                 self.log(f"{Fore.RED}Failed to send Telegram message: {e}{Style.RESET_ALL}")
 
     def print_question(self):
+        import os
+        if os.environ.get("AUTO_INPUT") == "1":
+            # AUTO MODE (untuk Docker)
+            faucet = True
+            choose = 2  # 1=Proxyscrape, 2=Private, 3=Tanpa Proxy
+            rotate = True
+            min_delay = 5
+            max_delay = 10
+            self.min_delay = min_delay
+            self.max_delay = max_delay
+            print(f"[AUTO] Faucet: {faucet}, Proxy: {choose}, Rotate: {rotate}, Min Delay: {min_delay}, Max Delay: {max_delay}")
+            return faucet, choose, rotate
+        # ... lanjutkan dengan mode manual seperti biasa
         while True:
             faucet = input(f"{Fore.YELLOW + Style.BRIGHT}Auto Claim Kite Token Faucet? [y/n] -> {Style.RESET_ALL}").strip()
             if faucet in ["y", "n"]:
@@ -321,15 +334,15 @@ class KiteAi:
                     print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter 'y' or 'n'.{Style.RESET_ALL}")
 
         while True:
-                try:
-                    min_delay = int(input(f"{Fore.YELLOW + Style.BRIGHT}Min Delay Each Interactions -> {Style.RESET_ALL}").strip())
-                    if min_delay >= 0:
-                        self.min_delay = min_delay
-                        break
-                    else:
-                        print(f"{Fore.RED + Style.BRIGHT}Min Delay must be >= 0.{Style.RESET_ALL}")
-                except ValueError:
-                    print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number.{Style.RESET_ALL}")
+            try:
+                min_delay = int(input(f"{Fore.YELLOW + Style.BRIGHT}Min Delay Each Interactions -> {Style.RESET_ALL}").strip())
+                if min_delay >= 0:
+                    self.min_delay = min_delay
+                    break
+                else:
+                    print(f"{Fore.RED + Style.BRIGHT}Min Delay must be >= 0.{Style.RESET_ALL}")
+            except ValueError:
+                print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number.{Style.RESET_ALL}")
 
         while True:
             try:
@@ -1008,18 +1021,8 @@ class KiteAi:
                         task = asyncio.create_task(self.process_accounts(i, address, faucet, use_proxy, rotate_proxy))
                         tasks.append(task)
                         
-                        if i < len(accounts):
-                            self.log(f"Menunggu 5 menit sebelum memulai akun berikutnya...")
-                            for remaining in range(300, 0, -1):
-                                print(
-                                    f"{Fore.CYAN+Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
-                                    f"{Fore.WHITE+Style.BRIGHT} | {Style.RESET_ALL}"
-                                    f"{Fore.BLUE+Style.BRIGHT}Akun berikutnya dimulai dalam {self.format_seconds(remaining)}...{Style.RESET_ALL}",
-                                    end="\r",
-                                    flush=True
-                                )
-                                await asyncio.sleep(1)
-                            print()
+                        self.log(f"Menunggu 2 menit sebelum memulai akun berikutnya...")
+                        await asyncio.sleep(120)
 
                 if tasks:
                     self.log("Semua akun telah dimulai, menunggu penyelesaian...")

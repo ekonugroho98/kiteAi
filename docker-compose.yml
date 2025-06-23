@@ -11,6 +11,8 @@ services:
       - ./captcha_key.txt:/app/captcha_key.txt
       - ./telegram.json:/app/telegram.json
     restart: unless-stopped
+    environment:
+      - AUTO_INPUT=1
 
 networks:
   kite-network:
