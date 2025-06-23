@@ -62,9 +62,6 @@ class KiteAi:
             f"""
         {Fore.GREEN + Style.BRIGHT}Auto BOT {Fore.BLUE + Style.BRIGHT}Kite Ai Ozone
             """
-            f"""
-        {Fore.GREEN + Style.BRIGHT}Rey? {Fore.YELLOW + Style.BRIGHT}<INI WATERMARK>
-            """
         )
 
     def format_seconds(self, seconds):
