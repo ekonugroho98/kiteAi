@@ -3,7 +3,7 @@ version: '3'
 services:
   kiteai-bot:
     build: .
-    command: python bot-anti.py
+    command: python task.py
     volumes:
       - ./accounts.txt:/app/accounts.txt
       - ./proxy.txt:/app/proxy.txt
@@ -13,6 +13,22 @@ services:
     restart: unless-stopped
     environment:
       - AUTO_INPUT=1
+    networks:
+      - kite-network
+
+  faucet-claimer:
+    build: .
+    command: python faucet-claim.py
+    volumes:
+      - ./accounts.txt:/app/accounts.txt
+      - ./proxy.txt:/app/proxy.txt
+      - ./captcha_key.txt:/app/captcha_key.txt
+      - ./telegram.json:/app/telegram.json
+    restart: unless-stopped
+    environment:
+      - AUTO_INPUT=1
+    networks:
+      - kite-network
 
 networks:
   kite-network:

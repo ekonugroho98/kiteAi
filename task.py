@@ -281,24 +281,15 @@ class KiteAi:
         import os
         if os.environ.get("AUTO_INPUT") == "1":
             # AUTO MODE (untuk Docker)
-            faucet = True
             choose = 2  # 1=Proxyscrape, 2=Private, 3=Tanpa Proxy
             rotate = True
             min_delay = 5
             max_delay = 10
             self.min_delay = min_delay
             self.max_delay = max_delay
-            print(f"[AUTO] Faucet: {faucet}, Proxy: {choose}, Rotate: {rotate}, Min Delay: {min_delay}, Max Delay: {max_delay}")
-            return faucet, choose, rotate
+            print(f"[AUTO] Proxy: {choose}, Rotate: {rotate}, Min Delay: {min_delay}, Max Delay: {max_delay}")
+            return choose, rotate
         # ... lanjutkan dengan mode manual seperti biasa
-        while True:
-            faucet = input(f"{Fore.YELLOW + Style.BRIGHT}Auto Claim Kite Token Faucet? [y/n] -> {Style.RESET_ALL}").strip()
-            if faucet in ["y", "n"]:
-                faucet = faucet == "y"
-                break
-            else:
-                print(f"{Fore.RED + Style.BRIGHT}Please enter 'y' or 'n'.{Style.RESET_ALL}")
-
         while True:
             try:
                 print(f"{Fore.WHITE + Style.BRIGHT}1. Run With Proxyscrape Free Proxy{Style.RESET_ALL}")
@@ -352,74 +343,8 @@ class KiteAi:
             except ValueError:
                 print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number.{Style.RESET_ALL}")
 
-        return faucet, choose, rotate
+        return choose, rotate
     
-    async def solve_recaptcha(self, proxy=None, retries=5):
-        if not self.CAPTCHA_KEY:
-            self.log(f"{Fore.RED+Style.BRIGHT}Anti-Captcha key not found.{Style.RESET_ALL}")
-            return None
-
-        create_task_payload = {
-            "clientKey": self.CAPTCHA_KEY,
-            "task": {
-                "type": "RecaptchaV2TaskProxyless",
-                "websiteURL": self.BASE_API,
-                "websiteKey": self.SITE_KEY,
-            }
-        }
-
-        for attempt in range(retries):
-            try:
-                async with ClientSession(timeout=ClientTimeout(total=60)) as session:
-                    async with session.post("https://api.anti-captcha.com/createTask", json=create_task_payload) as response:
-                        response.raise_for_status()
-                        result = await response.json()
-                        if result.get("errorId") != 0:
-                            self.log(f"{Fore.RED+Style.BRIGHT}Anti-Captcha Error (createTask): {result.get('errorDescription')}{Style.RESET_ALL}")
-                            await asyncio.sleep(5)
-                            continue
-
-                        task_id = result.get("taskId")
-                        self.log(
-                            f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                            f"{Fore.BLUE + Style.BRIGHT}Task Id :{Style.RESET_ALL}"
-                            f"{Fore.WHITE + Style.BRIGHT} {task_id} {Style.RESET_ALL}"
-                        )
-
-                        get_task_payload = {
-                            "clientKey": self.CAPTCHA_KEY,
-                            "taskId": task_id
-                        }
-                        for _ in range(40):
-                            await asyncio.sleep(3)
-                            async with session.post("https://api.anti-captcha.com/getTaskResult", json=get_task_payload) as res_response:
-                                res_response.raise_for_status()
-                                res_result = await res_response.json()
-
-                                if res_result.get("errorId") != 0:
-                                    self.log(f"{Fore.RED+Style.BRIGHT}Anti-Captcha Error (getTaskResult): {res_result.get('errorDescription')}{Style.RESET_ALL}")
-                                    break 
-
-                                status = res_result.get("status")
-                                if status == "ready":
-                                    return res_result.get("solution", {}).get("gRecaptchaResponse")
-                                elif status == "processing":
-                                    self.log(
-                                        f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                                        f"{Fore.BLUE + Style.BRIGHT}Message :{Style.RESET_ALL}"
-                                        f"{Fore.WHITE + Style.BRIGHT} Captcha Not Ready (processing) {Style.RESET_ALL}"
-                                    )
-                                    continue
-                                else:
-                                    self.log(f"{Fore.RED+Style.BRIGHT}Anti-Captcha unhandled status: {status}{Style.RESET_ALL}")
-                                    break
-            except (Exception, ClientResponseError) as e:
-                self.log(f"{Fore.RED+Style.BRIGHT}Error solving captcha: {e}{Style.RESET_ALL}")
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
-        return None
-        
     async def user_signin(self, address: str, proxy=None, retries=5):
         url = f"{self.NEO_API}/signin"
         data = json.dumps({"eoa":address})
@@ -570,37 +495,6 @@ class KiteAi:
                     f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
                     f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
                     f"{Fore.RED+Style.BRIGHT} Submit Answer Failed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
-                )
-
-        return None
-            
-    async def claim_faucet(self, address: str, recaptcha_token: str, proxy=None, retries=5):
-        url = f"{self.OZONE_API}/blockchain/faucet-transfer"
-        headers = {
-            **self.headers,
-            "Authorization": f"Bearer {self.access_tokens[address]}",
-            "Content-Length":"2",
-            "Content-Type": "application/json",
-            "x-recaptcha-token": recaptcha_token
-        }
-        await asyncio.sleep(3)
-        for attempt in range(retries):
-            connector = ProxyConnector.from_url(proxy) if proxy else None
-            try:
-                async with ClientSession(connector=connector, timeout=ClientTimeout(total=60)) as session:
-                    async with session.post(url=url, headers=headers, json={}) as response:
-                        response.raise_for_status()
-                        return await response.json()
-            except (Exception, ClientResponseError) as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
-                self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}  ● {Style.RESET_ALL}"
-                    f"{Fore.BLUE + Style.BRIGHT}Status  :{Style.RESET_ALL}"
-                    f"{Fore.RED+Style.BRIGHT} Not Claimed {Style.RESET_ALL}"
                     f"{Fore.MAGENTA+Style.BRIGHT}-{Style.RESET_ALL}"
                     f"{Fore.YELLOW+Style.BRIGHT} {str(e)} {Style.RESET_ALL}"
                 )
@@ -802,8 +696,7 @@ class KiteAi:
 
             return False
         
-    async def process_accounts(self, account_index: int, address: str, faucet: bool, use_proxy: bool, rotate_proxy: bool):
-        faucet_status = "Skipped"
+    async def process_accounts(self, account_index: int, address: str, use_proxy: bool, rotate_proxy: bool):
         quiz_status = "Skipped"
         stake_status = "Skipped"
         unstake_status = "Skipped"
@@ -861,27 +754,6 @@ class KiteAi:
                 f"{Fore.WHITE+Style.BRIGHT} {usdt_balance} USDT {Style.RESET_ALL}"
             )
 
-        if faucet:
-            is_claimable = user.get("data", {}).get("faucet_claimable", False)
-            self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}")
-            if is_claimable:
-                self.log(f"{Fore.YELLOW + Style.BRIGHT}Solving reCaptcha...{Style.RESET_ALL}")
-                recaptcha_token = await self.solve_recaptcha(proxy)
-                if recaptcha_token:
-                    claim = await self.claim_faucet(address, recaptcha_token, proxy)
-                    if claim:
-                        faucet_status = "Success"
-                        self.log(f"{Fore.GREEN + Style.BRIGHT}Claimed Successfully{Style.RESET_ALL}")
-                    else:
-                        faucet_status = "Failed"
-                else:
-                    faucet_status = "Failed (reCaptcha)"
-            else:
-                faucet_status = "Not Time to Claim"
-                self.log(f"{Fore.YELLOW+Style.BRIGHT}{faucet_status}{Style.RESET_ALL}")
-        else:
-            self.log(f"{Fore.CYAN+Style.BRIGHT}Faucet    :{Style.RESET_ALL}{Fore.YELLOW+Style.BRIGHT} Skipping Claim {Style.RESET_ALL}")
-
         create = await self.create_quiz(address, proxy)
         self.log(f"{Fore.CYAN+Style.BRIGHT}Daily Quiz:{Style.RESET_ALL}")
         if create:
@@ -918,11 +790,19 @@ class KiteAi:
         balance_stake_data = await self.token_balance(address, proxy)
         self.log(f"{Fore.CYAN+Style.BRIGHT}Stake     :{Style.RESET_ALL}")
         if balance_stake_data:
-            if balance_stake_data.get("data", {}).get("balances", {}).get("kite", 0) >= 1:
-                stake = await self.stake_token(address, 1, proxy)
-                stake_status = "Success" if stake else "Failed"
+            kite_balance_for_stake = balance_stake_data.get("data", {}).get("balances", {}).get("kite", 0)
+            min_stake = 0.01
+            max_stake = 0.1
+            if kite_balance_for_stake >= min_stake:
+                amount_to_stake = round(random.uniform(min_stake, max_stake), 4)
+                if kite_balance_for_stake >= amount_to_stake:
+                    self.log(f"{Fore.YELLOW+Style.BRIGHT}Attempting to stake {amount_to_stake} KITE...{Style.RESET_ALL}")
+                    stake = await self.stake_token(address, amount_to_stake, proxy)
+                    stake_status = f"Success ({amount_to_stake} KITE)" if stake else "Failed"
+                else:
+                    stake_status = f"Insufficient balance for random stake ({amount_to_stake} KITE)"
             else:
-                stake_status = "Insufficient Balance"
+                stake_status = "Insufficient Balance for staking (min 0.01 KITE)"
         else:
             stake_status = "Failed (Get Balance)"
         self.log(f"{Fore.YELLOW+Style.BRIGHT}{stake_status}{Style.RESET_ALL}")
@@ -957,7 +837,6 @@ class KiteAi:
         final_message += f"💰 Balance: {xp_balance} XP\n"
         final_message += f"💎 KITE: {kite_balance}\n"
         final_message += f"💵 USDT: {usdt_balance}\n"
-        final_message += f"🎯 Faucet Claim: {faucet_status}\n"
         quiz_emoji = "✅" if quiz_status == "Answered Successfully" else "❌"
         final_message += f"{quiz_emoji} Daily Quiz: {quiz_status}\n"
         stake_emoji = "✅" if stake_status == "Success" else "❌"
@@ -986,11 +865,11 @@ class KiteAi:
             
             self.load_telegram_config()
             
-            faucet, use_proxy_choice, rotate_proxy = self.print_question()
+            choose, rotate_proxy = self.print_question()
 
             while True:
                 use_proxy = False
-                if use_proxy_choice in [1, 2]:
+                if choose in [1, 2]:
                     use_proxy = True
 
                 self.clear_terminal()
@@ -1001,7 +880,7 @@ class KiteAi:
                 )
 
                 if use_proxy:
-                    await self.load_proxies(use_proxy_choice)
+                    await self.load_proxies(choose)
                 
                 tasks = []
                 for i, address in enumerate(accounts, 1):
@@ -1015,7 +894,7 @@ class KiteAi:
                         
                         self.log(f"{Fore.YELLOW}Menjadwalkan akun {i} ({self.mask_account(address)}) untuk dijalankan.{Style.RESET_ALL}")
                         
-                        task = asyncio.create_task(self.process_accounts(i, address, faucet, use_proxy, rotate_proxy))
+                        task = asyncio.create_task(self.process_accounts(i, address, use_proxy, rotate_proxy))
                         tasks.append(task)
                         
                         self.log(f"Menunggu 2 menit sebelum memulai akun berikutnya...")
